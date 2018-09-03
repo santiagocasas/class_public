@@ -507,7 +507,7 @@ int background_w_fld(
   aux_exp = 1/(1+exp( -(a - pba->gnq_a_tra)/ pba->gnq_a_sca));
   *w_fld = pba->gnq_w_inf + pba->gnq_w_dyn/(pow(a, pba->gnq_w_dec))*aux_exp ;
 
-  *dw_over_da_fld = ( -pow(a,-1-gnq_w_dec) * gnq_w_dec * gnq_w_dyn + ((pow(a, -gnq_w_dec) * gnq_w_dyn + gnq_w_inf)/gnq_a_sca) * (1-aux_exp) )*aux_exp;
+  *dw_over_da_fld = ( -pow(a,-1-pba->gnq_w_dec) * pba->gnq_w_dec * pba->gnq_w_dyn + ((pow(a, -pba->gnq_w_dec) * pba->gnq_w_dyn + pba->gnq_w_inf)/pba->gnq_a_sca) * (1-aux_exp) )*aux_exp;
   *integral_fld = 0;
 
 } else return _FALSE_;
