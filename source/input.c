@@ -1015,6 +1015,57 @@ int input_read_parameters(
              errmsg,
              "It looks like you want to fulfil the closure relation sum Omega = 1 using the scalar field, so you have to specify both Omega_lambda and Omega_fld in the .ini file");
 
+class_call(parser_read_string(pfc,"use_gnq",&string1,&flag1,errmsg),
+             errmsg,
+             errmsg);
+
+  if (flag1 == _TRUE_) {
+      if (strcmp(string1,"yes") == 0) {
+	pba->use_gnq = _TRUE_;
+	class_call(parser_read_string(pfc,"gnq_a_sca",&string1,&flag1,errmsg),
+             errmsg,
+             errmsg);
+  class_test( (flag1 == _FALSE_),
+             errmsg,
+             "For GNQ w(a) you need to specify gnq_a_sca");
+class_call(parser_read_string(pfc,"gnq_a_tra",&string1,&flag1,errmsg),
+             errmsg,
+             errmsg);
+  class_test( (flag1 == _FALSE_),
+             errmsg,
+             "For GNQ w(a) you need to specify gnq_a_tra");
+class_call(parser_read_string(pfc,"gnq_w_dyn",&string1,&flag1,errmsg),
+             errmsg,
+             errmsg);
+  class_test( (flag1 == _FALSE_),
+             errmsg,
+             "For GNQ w(a) you need to specify gnq_w_dyn");
+class_call(parser_read_string(pfc,"gnq_w_inf",&string1,&flag1,errmsg),
+             errmsg,
+             errmsg);
+  class_test( (flag1 == _FALSE_),
+             errmsg,
+             "For GNQ w(a) you need to specify gnq_w_inf");
+class_call(parser_read_string(pfc,"gnq_w_dec",&string1,&flag1,errmsg),
+             errmsg,
+             errmsg);
+  class_test( (flag1 == _FALSE_),
+             errmsg,
+             "For GNQ w(a) you need to specify gnq_w_dec");
+
+  class_read_double("gnq_a_sca", pba->gnq_a_sca);
+  class_read_double("gnq_a_tra", pba->gnq_a_tra);
+  class_read_double("gnq_w_dyn", pba->gnq_w_dyn);
+  class_read_double("gnq_w_dec", pba->gnq_w_dec);
+  class_read_double("gnq_w_inf", pba->gnq_w_inf);
+      } else {
+	pba->use_gnq = _FALSE_;
+      }
+  } else {
+    pba->use_gnq = _FALSE_;
+  }
+
+
   if (pba->Omega0_fld != 0.) {
     class_read_double("w0_fld",pba->w0_fld);
     class_read_double("wa_fld",pba->wa_fld);
