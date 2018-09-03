@@ -12,6 +12,7 @@
 
 enum spatial_curvature {flat,open,closed};
 
+enum {gnq_no, gnq_yes};
 /**
  * All background parameters and evolution that other modules need to know.
  *
@@ -57,15 +58,19 @@ struct background
 		     in the frame comoving with the fluid (so, this is
 		     not [delta p/delta rho] in the synchronous or
 		     newtonian gauge!!!) */
-
+  short use_gnq;  /**< flag switching GNQ equation of state */
   short use_ppf; /**< flag switching on PPF perturbation equations
                     instead of true fluid equations for
                     perturbations. It could have been defined inside
                     perturbation structure, but we leave it here in
                     such way to have all fld parameters grouped. */
+  double gnq_a_tra; /**< GNQ parameter transition for w(a) */
+  double gnq_a_sca; /**< GNQ parameter scale for w(a) */
+  double gnq_w_dyn; /**< GNQ parameter dynamic for w(a) */
+  double gnq_w_inf; /**< GNQ parameter infinity for w(a) */
+  double gnq_w_dec; /**< GNQ parameter decaying for w(a) */
 
   double c_gamma_over_c_fld; /**< ppf parameter defined in eq. (16) of 0808.3125 [astro-ph] */
-
   double Omega0_ur; /**< \f$ \Omega_{0 \nu r} \f$: ultra-relativistic neutrinos */
 
   double Omega0_dcdmdr; /**< \f$ \Omega_{0 dcdm}+\Omega_{0 dr} \f$: decaying cold dark matter (dcdm) decaying to dark radiation (dr) */
