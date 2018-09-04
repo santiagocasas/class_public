@@ -96,6 +96,10 @@
  */
 static double gnq_w_switch = 0.2; //FIXME move some where else?, find value
 
+//FIXME read from ini?, find working setting
+static double gnq_acc = 1e-5;
+static int gnq_max_steps = 30;
+
 int background_at_tau(
                       struct background *pba,
                       double tau,
@@ -1943,12 +1947,10 @@ int background_initial_conditions(
       if(a<pba->gnq_a_tra*gnq_w_switch)
         integration_successful =_TRUE_;
       else{
-        //FIXME find working accuracy setting
-        int max_steps = 30; //FIXME read from ini
         int i, j;
-        double acc = 1e-5; //FIXME read from ini
+
         // romberg integration adapted from https://en.wikipedia.org/wiki/Romberg%27s_method#Implementation
-        double R1[max_steps], R2[max_steps]; //buffers
+        double R1[gnq_max_steps], R2[gnq_max_steps]; //buffers
         double *Rp = &R1[0], *Rc = &R2[0]; //Rp is previous row, Rc is current row
         double h = (pba->a_today - a); //step size
         double this_w_fld, this_dw_over_da_fld, this_integral_fld;
@@ -1958,7 +1960,7 @@ int background_initial_conditions(
         class_call(background_w_fld(pba,a,&this_w_fld,&this_dw_over_da_fld,&this_integral_fld), pba->error_message, pba->error_message);
         Rp[0] += 3.0 * (1. + this_w_fld) / a * h *.5;
 
-        for(i = 1; i < max_steps; ++i){
+        for(i = 1; i < gnq_max_steps; ++i){
           h /= 2.;
           double c = 0;
           size_t ep = 1 << (i-1); //2^(n-1)
@@ -1973,7 +1975,7 @@ int background_initial_conditions(
             double n_k = pow(4, j);
             Rc[j] = (n_k*Rc[j-1] - Rp[j-1])/(n_k-1); //compute R(i,j)
           }
-          if(i > 1 && fabs(Rp[i-1]-Rc[i]) < acc){
+          if(i > 1 && fabs(Rp[i-1]-Rc[i]) < gnq_acc){
             integral_fld = Rc[i-1];
             integration_successful = _TRUE_;
             break;
