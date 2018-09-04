@@ -94,6 +94,7 @@
  * @param pvecback      Output: vector (assumed to be already allocated)
  * @return the error status
  */
+static double gnq_w_switch = 0.2; //FIXME move some where else?, find value
 
 int background_at_tau(
                       struct background *pba,
@@ -505,16 +506,16 @@ int background_w_fld(
   double aux_exp;
 
   aux_exp = 1/(1+exp( -(a - pba->gnq_a_tra)/ pba->gnq_a_sca));
-  if(a< pba->gnq_a_tra*0.2)
-    *w_fld = 0;
-  else
-    *w_fld = (pba->gnq_w_inf + pba->gnq_w_dyn/pow(a, pba->gnq_w_dec))*aux_exp ;
 
-  if(a< pba->gnq_a_tra*0.2)
+  if(a< pba->gnq_a_tra*gnq_w_switch){
     *dw_over_da_fld = 0;
-  else
+    *w_fld = 0;
+  }
+  else{
+    *w_fld = (pba->gnq_w_inf + pba->gnq_w_dyn/pow(a, pba->gnq_w_dec))*aux_exp ;
     *dw_over_da_fld = ( -pow(a,-1-pba->gnq_w_dec) * pba->gnq_w_dec * pba->gnq_w_dyn + ((pow(a, -pba->gnq_w_dec) * pba->gnq_w_dyn + pba->gnq_w_inf)/pba->gnq_a_sca) * (1-aux_exp) )*aux_exp;
-  *integral_fld = 0;
+  }
+    *integral_fld = 0;
 
 } else return _FALSE_;
   return _SUCCESS_;
@@ -1939,7 +1940,7 @@ int background_initial_conditions(
       integral_fld = 0.0;
       int integration_successful = _FALSE_;
 
-      if(a<pba->gnq_a_tra*0.2) //FIXME add variable for cut, find good value
+      if(a<pba->gnq_a_tra*gnq_w_switch)
         integration_successful =_TRUE_;
       else{
         //FIXME find working accuracy setting
