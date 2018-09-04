@@ -505,9 +505,15 @@ int background_w_fld(
   double aux_exp;
 
   aux_exp = 1/(1+exp( -(a - pba->gnq_a_tra)/ pba->gnq_a_sca));
-  *w_fld = pba->gnq_w_inf + pba->gnq_w_dyn/(pow(a, pba->gnq_w_dec))*aux_exp ;
+  if(a< pba->gnq_a_tra*0.2)
+    *w_fld = 0;
+  else
+    *w_fld = (pba->gnq_w_inf + pba->gnq_w_dyn/pow(a, pba->gnq_w_dec))*aux_exp ;
 
-  *dw_over_da_fld = ( -pow(a,-1-pba->gnq_w_dec) * pba->gnq_w_dec * pba->gnq_w_dyn + ((pow(a, -pba->gnq_w_dec) * pba->gnq_w_dyn + pba->gnq_w_inf)/pba->gnq_a_sca) * (1-aux_exp) )*aux_exp;
+  if(a< pba->gnq_a_tra*0.2)
+    *dw_over_da_fld = 0;
+  else
+    *dw_over_da_fld = ( -pow(a,-1-pba->gnq_w_dec) * pba->gnq_w_dec * pba->gnq_w_dyn + ((pow(a, -pba->gnq_w_dec) * pba->gnq_w_dyn + pba->gnq_w_inf)/pba->gnq_a_sca) * (1-aux_exp) )*aux_exp;
   *integral_fld = 0;
 
 } else return _FALSE_;
@@ -1932,9 +1938,10 @@ int background_initial_conditions(
     if(pba->use_gnq == gnq_yes) {
       integral_fld = 0.0;
       int integration_successful = _FALSE_;
-      int max_steps = 20;
+      //FIXME find working accuracy setting
+      int max_steps = 30; //FIXME read from ini
       int i, j;
-      double acc = 1e-5;
+      double acc = 1e-3; //FIXME read from ini
       // romberg integration adapted from https://en.wikipedia.org/wiki/Romberg%27s_method#Implementation
       double R1[max_steps], R2[max_steps]; //buffers
       double *Rp = &R1[0], *Rc = &R2[0]; //Rp is previous row, Rc is current row
