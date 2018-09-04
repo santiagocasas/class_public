@@ -1938,48 +1938,52 @@ int background_initial_conditions(
     if(pba->use_gnq == gnq_yes) {
       integral_fld = 0.0;
       int integration_successful = _FALSE_;
-      //FIXME find working accuracy setting
-      int max_steps = 30; //FIXME read from ini
-      int i, j;
-      double acc = 1e-3; //FIXME read from ini
-      // romberg integration adapted from https://en.wikipedia.org/wiki/Romberg%27s_method#Implementation
-      double R1[max_steps], R2[max_steps]; //buffers
-      double *Rp = &R1[0], *Rc = &R2[0]; //Rp is previous row, Rc is current row
-      double h = (pba->a_today - a); //step size
-      double this_w_fld, this_dw_over_da_fld, this_integral_fld;
-      Rp[0] = 0.0;
-      class_call(background_w_fld(pba,pba->a_today,&this_w_fld,&this_dw_over_da_fld,&this_integral_fld), pba->error_message, pba->error_message);
-      Rp[0] = 3.0 * (1. + this_w_fld) / pba->a_today * h *.5;
-      class_call(background_w_fld(pba,a,&this_w_fld,&this_dw_over_da_fld,&this_integral_fld), pba->error_message, pba->error_message);
-      Rp[0] += 3.0 * (1. + this_w_fld) / a * h *.5;
 
-      for(i = 1; i < max_steps; ++i){
-	  h /= 2.;
-	  double c = 0;
-	  size_t ep = 1 << (i-1); //2^(n-1)
+      if(a<pba->gnq_a_tra*0.2) //FIXME add variable for cut, find good value
+        integration_successful =_TRUE_;
+      else{
+        //FIXME find working accuracy setting
+        int max_steps = 30; //FIXME read from ini
+        int i, j;
+        double acc = 1e-5; //FIXME read from ini
+        // romberg integration adapted from https://en.wikipedia.org/wiki/Romberg%27s_method#Implementation
+        double R1[max_steps], R2[max_steps]; //buffers
+        double *Rp = &R1[0], *Rc = &R2[0]; //Rp is previous row, Rc is current row
+        double h = (pba->a_today - a); //step size
+        double this_w_fld, this_dw_over_da_fld, this_integral_fld;
+        Rp[0] = 0.0;
+        class_call(background_w_fld(pba,pba->a_today,&this_w_fld,&this_dw_over_da_fld,&this_integral_fld), pba->error_message, pba->error_message);
+        Rp[0] = 3.0 * (1. + this_w_fld) / pba->a_today * h *.5;
+        class_call(background_w_fld(pba,a,&this_w_fld,&this_dw_over_da_fld,&this_integral_fld), pba->error_message, pba->error_message);
+        Rp[0] += 3.0 * (1. + this_w_fld) / a * h *.5;
 
-	  for(j = 1; j <= ep; ++j){
-	    class_call(background_w_fld(pba,a+(2*j-1)*h,&this_w_fld,&this_dw_over_da_fld,&this_integral_fld), pba->error_message, pba->error_message);
-	    c += 3.0 * (1. + this_w_fld) / (a+(2*j-1)*h);
-	  }
-	  Rc[0] = h*c + .5*Rp[0]; //R(i,0)
+        for(i = 1; i < max_steps; ++i){
+          h /= 2.;
+          double c = 0;
+          size_t ep = 1 << (i-1); //2^(n-1)
 
-	  for(j = 1; j <= i; ++j){
-	    double n_k = pow(4, j);
-	    Rc[j] = (n_k*Rc[j-1] - Rp[j-1])/(n_k-1); //compute R(i,j)
-	  }
-	  if(i > 1 && fabs(Rp[i-1]-Rc[i]) < acc){
-	    integral_fld = Rc[i-1];
-	    integration_successful = _TRUE_;
-	    break;
-	  }
+          for(j = 1; j <= ep; ++j){
+            class_call(background_w_fld(pba,a+(2*j-1)*h,&this_w_fld,&this_dw_over_da_fld,&this_integral_fld), pba->error_message, pba->error_message);
+            c += 3.0 * (1. + this_w_fld) / (a+(2*j-1)*h);
+          }
+          Rc[0] = h*c + .5*Rp[0]; //R(i,0)
 
-	  //swap Rn and Rc as we only need the last row
-	  double *rt = Rp;
-	  Rp = Rc;
-	  Rc = rt;
+          for(j = 1; j <= i; ++j){
+            double n_k = pow(4, j);
+            Rc[j] = (n_k*Rc[j-1] - Rp[j-1])/(n_k-1); //compute R(i,j)
+          }
+          if(i > 1 && fabs(Rp[i-1]-Rc[i]) < acc){
+            integral_fld = Rc[i-1];
+            integration_successful = _TRUE_;
+            break;
+          }
+
+          //swap Rn and Rc as we only need the last row
+          double *rt = Rp;
+          Rp = Rc;
+          Rc = rt;
+        }
       }
-
       class_test(integration_successful == _FALSE_,
 		 pba->error_message,
 		 "The integration of w(a) failed - you might want to lower the requested precision");
