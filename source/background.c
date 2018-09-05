@@ -94,12 +94,17 @@
  * @param pvecback      Output: vector (assumed to be already allocated)
  * @return the error status
  */
-static double gnq_w_switch = 0.2; //FIXME move some where else?, find value
+static double gnq_w_switch = 10.; //FIXME move some where else?, find value
 
 //FIXME read from ini?, find working setting
 static double gnq_acc = 1e-5;
-static int gnq_max_steps = 30;
+static int gnq_max_steps = 100;
 
+static inline double min(double a, double b){//FIXME are there templates in C?
+  if(b<a)
+    return b;
+  return a;
+}
 int background_at_tau(
                       struct background *pba,
                       double tau,
@@ -507,17 +512,22 @@ int background_w_fld(
       Recfast does not assume anything */
 } else if (pba->use_gnq == gnq_yes) {
 
-  double aux_exp;
 
-  aux_exp = 1/(1+exp( -(a - pba->gnq_a_tra)/ pba->gnq_a_sca));
-
-  if(a< pba->gnq_a_tra*gnq_w_switch){
+  if(a<0.1){//set w = 0 at early times
     *dw_over_da_fld = 0;
     *w_fld = 0;
   }
+  else if(a -pba->gnq_a_tra > pba->gnq_a_sca*gnq_w_switch){//little speed up by avoid evaluating the exp
+    double pow_a= 1./pow(a, pba->gnq_w_dec);
+    *w_fld = (pba->gnq_w_inf + pba->gnq_w_dyn*pow_a);
+    *dw_over_da_fld = ( -pow_a/a * pba->gnq_w_dec * pba->gnq_w_dyn);
+  }
   else{
-    *w_fld = (pba->gnq_w_inf + pba->gnq_w_dyn/pow(a, pba->gnq_w_dec))*aux_exp ;
-    *dw_over_da_fld = ( -pow(a,-1-pba->gnq_w_dec) * pba->gnq_w_dec * pba->gnq_w_dyn + ((pow(a, -pba->gnq_w_dec) * pba->gnq_w_dyn + pba->gnq_w_inf)/pba->gnq_a_sca) * (1-aux_exp) )*aux_exp;
+    double theta = 1/(1+exp( -(a - pba->gnq_a_tra)/ pba->gnq_a_sca));
+    double pow_a= 1./pow(a, pba->gnq_w_dec);
+
+    *w_fld = (pba->gnq_w_inf + pba->gnq_w_dyn*pow_a)*theta ;
+    *dw_over_da_fld = -pow_a/a * pba->gnq_w_dec * pba->gnq_w_dyn*theta + (*w_fld)/pba->gnq_a_sca * (1-theta) ;
   }
     *integral_fld = 0;
 
@@ -1941,52 +1951,60 @@ int background_initial_conditions(
     [(1+w_fld)/a] da] (e.g. with the Romberg method?) instead of
     calling background_w_fld */
     if(pba->use_gnq == gnq_yes) {
+      //split int_a^a_today into three part eerly times  = 0, late times power law, in between numeric
       integral_fld = 0.0;
+      double a_switch = pba->gnq_a_tra + pba->gnq_a_sca*gnq_w_switch;
+      double a_e = min(0.1,a);
+      double a_l = min(a,a_switch);
+      //contribution from late times
+      double integral_late = 3*((1+pba->gnq_w_inf)*log(pba->a_today/a_l)+pba->gnq_w_dyn/pba->gnq_w_dec*(pow(pba->a_today,-pba->gnq_w_dec)-pow(a_l,-pba->gnq_w_dec)));
       int integration_successful = _FALSE_;
+      if(a<a_l){
+      int i, j;
 
-      if(a<pba->gnq_a_tra*gnq_w_switch)
-        integration_successful =_TRUE_;
-      else{
-        int i, j;
+      // romberg integration adapted from https://en.wikipedia.org/wiki/Romberg%27s_method#Implementation
+      double R1[gnq_max_steps], R2[gnq_max_steps]; //buffers
+      double *Rp = &R1[0], *Rc = &R2[0]; //Rp is previous row, Rc is current row
+      double h = (a_l - a); //step size
+      double this_w_fld, this_dw_over_da_fld, this_integral_fld;
+      Rp[0] = 0.0;
+      class_call(background_w_fld(pba,a_l,&this_w_fld,&this_dw_over_da_fld,&this_integral_fld), pba->error_message, pba->error_message);
+      Rp[0] = 3.0 * (1. + this_w_fld) /a_l* h *.5;
+      class_call(background_w_fld(pba,a,&this_w_fld,&this_dw_over_da_fld,&this_integral_fld), pba->error_message, pba->error_message);
+      Rp[0] += 3.0 * (1. + this_w_fld) / a * h *.5;
 
-        // romberg integration adapted from https://en.wikipedia.org/wiki/Romberg%27s_method#Implementation
-        double R1[gnq_max_steps], R2[gnq_max_steps]; //buffers
-        double *Rp = &R1[0], *Rc = &R2[0]; //Rp is previous row, Rc is current row
-        double h = (pba->a_today - a); //step size
-        double this_w_fld, this_dw_over_da_fld, this_integral_fld;
-        Rp[0] = 0.0;
-        class_call(background_w_fld(pba,pba->a_today,&this_w_fld,&this_dw_over_da_fld,&this_integral_fld), pba->error_message, pba->error_message);
-        Rp[0] = 3.0 * (1. + this_w_fld) / pba->a_today * h *.5;
-        class_call(background_w_fld(pba,a,&this_w_fld,&this_dw_over_da_fld,&this_integral_fld), pba->error_message, pba->error_message);
-        Rp[0] += 3.0 * (1. + this_w_fld) / a * h *.5;
+      for(i = 1; i < gnq_max_steps; ++i){
+        h /= 2.;
+        double c = 0;
+        size_t ep = 1 << (i-1); //2^(n-1)
 
-        for(i = 1; i < gnq_max_steps; ++i){
-          h /= 2.;
-          double c = 0;
-          size_t ep = 1 << (i-1); //2^(n-1)
-
-          for(j = 1; j <= ep; ++j){
-            class_call(background_w_fld(pba,a+(2*j-1)*h,&this_w_fld,&this_dw_over_da_fld,&this_integral_fld), pba->error_message, pba->error_message);
-            c += 3.0 * (1. + this_w_fld) / (a+(2*j-1)*h);
-          }
-          Rc[0] = h*c + .5*Rp[0]; //R(i,0)
-
-          for(j = 1; j <= i; ++j){
-            double n_k = pow(4, j);
-            Rc[j] = (n_k*Rc[j-1] - Rp[j-1])/(n_k-1); //compute R(i,j)
-          }
-          if(i > 1 && fabs(Rp[i-1]-Rc[i]) < gnq_acc){
-            integral_fld = Rc[i-1];
-            integration_successful = _TRUE_;
-            break;
-          }
-
-          //swap Rn and Rc as we only need the last row
-          double *rt = Rp;
-          Rp = Rc;
-          Rc = rt;
+        for(j = 1; j <= ep; ++j){
+          class_call(background_w_fld(pba,a+(2*j-1)*h,&this_w_fld,&this_dw_over_da_fld,&this_integral_fld), pba->error_message, pba->error_message);
+          c += 3.0 * (1. + this_w_fld) / (a+(2*j-1)*h);
         }
+        Rc[0] = h*c + .5*Rp[0]; //R(i,0)
+
+        for(j = 1; j <= i; ++j){
+          double n_k = pow(4, j);
+          Rc[j] = (n_k*Rc[j-1] - Rp[j-1])/(n_k-1); //compute R(i,j)
+        }
+        if(i > 1 && fabs(Rp[i-1]-Rc[i]) < gnq_acc){
+          integral_fld = Rc[i-1]+integral_late;
+          integration_successful = _TRUE_;
+          break;
+        }
+
+        //swap Rn and Rc as we only need the last row
+        double *rt = Rp;
+        Rp = Rc;
+        Rc = rt;
       }
+      }
+      else{
+        integral_fld = integral_late;
+        integration_successful = _TRUE_;
+      }
+
       class_test(integration_successful == _FALSE_,
 		 pba->error_message,
 		 "The integration of w(a) failed - you might want to lower the requested precision");
