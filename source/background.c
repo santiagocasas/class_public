@@ -95,6 +95,7 @@
  * @return the error status
  */
 static double gnq_w_switch = 10.; //FIXME move some where else?, find value
+static double gnq_a_reg = 1e-4; //add phase of negative w to regularize perturbations
 
 //FIXME read from ini?, find working setting
 static double gnq_acc = 1e-5;
@@ -512,8 +513,12 @@ int background_w_fld(
       Recfast does not assume anything */
 } else if (pba->use_gnq == gnq_yes) {
 
-
-  if(a<0.1){//set w = 0 at early times
+  if(a<gnq_a_reg){
+    double a_rat = a/gnq_a_reg;
+    *w_fld = -1+2*a_rat-a_rat*a_rat;
+    *dw_over_da_fld = 2/gnq_a_reg*(1-gnq_a_reg);
+  }
+  else if(a<0.1){//set w = 0 at early times
     *dw_over_da_fld = 0;
     *w_fld = 0;
   }
@@ -1951,7 +1956,7 @@ int background_initial_conditions(
     [(1+w_fld)/a] da] (e.g. with the Romberg method?) instead of
     calling background_w_fld */
     if(pba->use_gnq == gnq_yes) {
-      //split int_a^a_today into three part eerly times  = 0, late times power law, in between numeric
+      //split int_a^a_today into three part early times  = 0, late times power law, in between numeric
       integral_fld = 0.0;
       double a_switch = pba->gnq_a_tra + pba->gnq_a_sca*gnq_w_switch;
       double a_e = min(0.1,a);
@@ -1959,6 +1964,11 @@ int background_initial_conditions(
       //contribution from late times
       double integral_late = 3*((1+pba->gnq_w_inf)*log(pba->a_today/a_l)+pba->gnq_w_dyn/pba->gnq_w_dec*(pow(pba->a_today,-pba->gnq_w_dec)-pow(a_l,-pba->gnq_w_dec)));
       int integration_successful = _FALSE_;
+      double integral_reg = 0;
+      if(a<gnq_a_reg){
+        double a_ratio = a/gnq_a_reg;
+        integral_reg = 3*(1.5-2*a_ratio+0.5*a_ratio*a_ratio);
+      }
       if(a<a_l){
       int i, j;
 
@@ -1989,7 +1999,7 @@ int background_initial_conditions(
           Rc[j] = (n_k*Rc[j-1] - Rp[j-1])/(n_k-1); //compute R(i,j)
         }
         if(i > 1 && fabs(Rp[i-1]-Rc[i]) < gnq_acc){
-          integral_fld = Rc[i-1]+integral_late;
+          integral_fld = Rc[i-1]+integral_late +integral_reg;
           integration_successful = _TRUE_;
           break;
         }
@@ -2001,7 +2011,7 @@ int background_initial_conditions(
       }
       }
       else{
-        integral_fld = integral_late;
+        integral_fld = integral_late +integral_reg;
         integration_successful = _TRUE_;
       }
 
