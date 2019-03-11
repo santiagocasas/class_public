@@ -1964,20 +1964,19 @@ int background_initial_conditions(
       int integration_successful = _FALSE_;
       double integral_tmp = 0;
 
-      double a_limit = max(a,gnq_a_reg);
       if(a<gnq_a_reg){
-        double a_ratio = a_limit/gnq_a_reg;
-        integral_tmp +=(4.5*a_ratio*a_ratio-2*a_ratio*a_ratio*a_ratio);
+        double a_ratio = a/gnq_a_reg;
+        integral_tmp +=(2.5-(4.5*a_ratio*a_ratio-2*a_ratio*a_ratio*a_ratio));
       }
 
       if(a<gnq_a_fit){
-        a_limit = max(a,gnq_a_reg);
-        integral_tmp+=3*log(gnq_a_reg/a_limit);
+        double a_limit = max(a,gnq_a_reg);
+        integral_tmp+=3*log(gnq_a_fit/a_limit);
       }
 
       if(a<a_switch)
       {
-        a_limit = max(a,gnq_a_fit);
+        double a_limit = max(a,gnq_a_fit);
         int i, j;
 
       // romberg integration adapted from https://en.wikipedia.org/wiki/Romberg%27s_method#Implementation
@@ -2024,8 +2023,8 @@ int background_initial_conditions(
         integration_successful = _TRUE_;
       }
 
-      a_limit =max(a,a_switch);
-      integral_tmp += 3*((1+pba->gnq_w_inf)*log(pba->a_today/a_limit)+pba->gnq_w_dyn/pba->gnq_w_dec*(pow(pba->a_today,-pba->gnq_w_dec)-pow(a_limit,-pba->gnq_w_dec)));
+      double a_limit = max(a,a_switch);
+      integral_tmp += 3*((1+pba->gnq_w_inf)*log(a_limit/pba->a_today)+pba->gnq_w_dyn/pba->gnq_w_dec*(pow(pba->a_today,-pba->gnq_w_dec)-pow(a_limit,-pba->gnq_w_dec)));
 
       integral_fld = integral_tmp;
       class_test(integration_successful == _FALSE_,
