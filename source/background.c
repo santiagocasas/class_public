@@ -95,7 +95,7 @@
  * @return the error status
  */
 static double gnq_w_switch = 10.; //FIXME move some where else?, find value
-static double gnq_a_reg = 1e-4; //add phase of negative w to regularize perturbations
+static double gnq_a_reg = 1e-10; //add phase of negative w to regularize perturbations
 static double gnq_a_fit = 0.1;
 
 //FIXME read from ini?, find working setting
@@ -516,8 +516,8 @@ int background_w_fld(
 
   if(a<gnq_a_reg){
     double a_rat = a/gnq_a_reg;
-    *w_fld = -1+2*a_rat-a_rat*a_rat;
-    *dw_over_da_fld = 2/gnq_a_reg*(1-gnq_a_reg);
+    *w_fld = -1+3*a_rat*a_rat-2*a_rat*a_rat*a_rat;
+    *dw_over_da_fld = 6*a_rat*(1-a_rat)/gnq_a_reg;
   }
   else if(a<gnq_a_fit){//set w = 0 at early times
     *dw_over_da_fld = 0;
@@ -533,7 +533,7 @@ int background_w_fld(
     double pow_a= 1./pow(a, pba->gnq_w_dec);
 
     *w_fld = (pba->gnq_w_inf + pba->gnq_w_dyn*pow_a)*theta ;
-    *dw_over_da_fld = -pow_a/a * pba->gnq_w_dec * pba->gnq_w_dyn*theta + (*w_fld)/pba->gnq_a_sca * (1-theta) ;
+    *dw_over_da_fld = -pow_a/a * pba->gnq_w_dec * pba->gnq_w_dyn*theta - (*w_fld)/pba->gnq_a_sca * (1-theta) ;
   }
     *integral_fld = 0;
 
@@ -1967,7 +1967,7 @@ int background_initial_conditions(
       double a_limit = max(a,gnq_a_reg);
       if(a<gnq_a_reg){
         double a_ratio = a_limit/gnq_a_reg;
-        integral_tmp += 3*(1.5-2*a_ratio+0.5*a_ratio*a_ratio);
+        integral_tmp +=(4.5*a_ratio*a_ratio-2*a_ratio*a_ratio*a_ratio);
       }
 
       if(a<gnq_a_fit){
